@@ -11,6 +11,7 @@ class Node {
 public:
 	Node * right;
 	Node * left;
+	Node * previous;
 	int key;
 	int value;
 	int height;
@@ -19,6 +20,7 @@ public:
 		value = newValue;
 		right = nullptr;
 		left = nullptr;
+		previous = nullptr;
 		height = 1;
 	}
 };
@@ -44,28 +46,62 @@ public:
 		else {
 			if (!recursiveFindKeyBool(head, key)) { //make sure the key isnt already in the tree
 				Node * current = head;
-				Node * previous = head;
+				Node * previous, *temp, *test;
 				int done = 1;
 				while (done) { //gives me something to itterate over while I find a null value
-					if (current->key < key) { //we are going to check to see if its going to be the left or right
+					if (key < current->key) { //we are going to check to see if its going to be the left or right
 						previous = current;
 						current = current->left;
 						if (!current) { //it was the left and I have found a null value so insert a new one
 							current = new Node(key, value);
-							previous->left = current; //Make sure to update the previous left or the print wont work
+							current->previous = previous; //Make sure to update the previous the print wont work
+							previous->left = current;
+							test = current;//This block itterates through the tree to make sure we don't need to balance it out.
+							while (test) {
+								int height1 = height(test->left);
+								int height2 = height(test->right);
+								if ((height1 - height2) == 2) {
+									singleRight(test);
+								}
+								else if ((height2 - height1) == 2) {
+									doubleRight(test);
+								}
+								test = test->previous;
+							}
+							temp = previous; //the lower block of this code controls the updating of heights
+							while (temp) {
+								temp->height = height(temp);
+								temp = temp->previous;
+							}
 							size++;
-							updateHeights();
 							done = 0;
 						}
 					}
-					else if (current->key >= key) { //like above we are going over the tree to the right
+					else if (key > current->key) { //like above we are going over the tree to the right
 						previous = current;
 						current = current->right;
 						if (!current) { //looks like we found it on the right and we have a null value to insert it
 							current = new Node(key, value);
+							current->previous = previous; //Make sure to update the previous the print wont work
 							previous->right = current;
+							test = current;//This block itterates through the tree to make sure we don't need to balance it out.
+							while (test) {
+								int height1 = height(test->right);
+								int height2 = height(test->left);
+								if ((height1 - height2) == 2) {
+									singleLeft(test);
+								}
+								else if ((height2 - height1) == 2) {
+									doubleLeft(test);
+								}
+								test = test->previous;
+							}
+							temp = previous;//the lower block of this code controls the updating of heights
+							while (temp) {
+								temp->height = height(temp);
+								temp = temp->previous;
+							}
 							size++;
-							updateHeights();
 							done = 0;
 						}
 					}
@@ -89,7 +125,7 @@ public:
 		return size;
 	}
 
-	/*Returns the height of the head of the tree that is kept track of from updaingTrees*/
+	/*Returns the height of the head of the tree*/
 	int getHeight() {
 		return head->height;
 	}
@@ -128,12 +164,13 @@ private:
 			return recursiveFindKeyBool(current->right, keyToFind); // call a recursive search on the right side
 		}
 	}
+
 	/*Used in the find method to find the address of the key we gave*/
 	NODEPTR recursiveFindKeyAddress(Node * current, int keyToFind) {
 		if (!current) { //base case
 			return NULLNODE;
 		}
-		if (current->key == keyToFind) { 
+		if (current->key == keyToFind) {
 			return current; //congrats we found it! Go ahead and return it so I can deal with it
 		}
 		else {
@@ -167,36 +204,120 @@ private:
 		}
 		else {
 			count++; //before we call left we should shove everything over a bit
-			recursivePrint(head->left, count); //calls itself to the left
+			recursivePrint(head->right, count); //calls itself to the left
 			for (int i = 0; i < count; i++) {
 				cout << "      "; //Prints enough spaces to look nice
 			}
 			cout << head->key << "," << head->value << endl; //prints out the current node
-			recursivePrint(head->right, count); //calls itself to the right
+			recursivePrint(head->left, count); //calls itself to the right
 
 		}
 	}
 
-	/*This method is only used as an inbetween point that the user never needs to touch. Hands off!*/
-	void updateHeights() {
-		updateHeightsRecursive(head); //Call the recursive version
-	}
-
-	/*This method is used to recursively run through the list and update the heights of every node. The goal here is to make it easier for myself
-		when I go to do the auto balancing*/
-	int updateHeightsRecursive(Node * current) {
+	/*Used in with conjunction of the insert method to update height of each node recursively of course*/
+	int height(Node * current) {
 		if (!current) { //base case
 			return 0;
 		}
-		int counter1 = updateHeightsRecursive(current->left); //navigate down the tree to the right
-		int counter2 = updateHeightsRecursive(current->right); //navigate to the left!
-		if (counter1 > counter2) { //well if one is greater than the other then we need to use that number
-			current->height = counter1 + 1; //update the height
-			return current->height; //return it for the recursion to use in the future (or is it considered the past?)
+		int counter1 = height(current->left);
+		int counter2 = height(current->right);
+		if (counter1 > counter2) { //falls down the tree to add up the heights
+			current->height = counter1 + 1;
+			return counter1 + 1;
 		}
-		else { //either we didn't get a higher value or the second one is bigger
-			current->height = counter2 + 1; //update the height
-			return current->height; //return it like above
+		current->height = counter2 + 1;
+		return counter2 + 1;
+	}
+
+	/*Is used by insert to balance out the tree to the left. Its kind of a mess I know.*/
+	void singleRight(Node * current) {
+		Node * temp;//The following jumble does a single left rotation by moving around everything
+		temp = current->left;
+		current->left = temp->right;
+		temp->right = current;
+		temp->previous = current->previous; //dont forget to set the previous values! or you'll get a stack overflow...
+		if (current->left) {
+			current->left->previous = current;
 		}
+		if (current == head) { //need to make sure we dont need to change the head
+			temp->previous = nullptr;
+			head = temp;
+		}
+		else if (current->previous->left == current) { //change the right value so it will properly print out
+			current->previous->left = temp;
+		}
+		else {
+			current->previous->right = temp;
+		}
+		current->previous = temp;
+	}
+
+	/*Is used by insert to balance out the tree to the right. It is practically the same as above but with a few left or rights changed.*/
+	void singleLeft(Node * current) {
+		Node * temp;
+		temp = current->right;
+		current->right = temp->left;
+		temp->left = current;
+		temp->previous = current->previous;
+		if (current->left) {
+			current->left->previous = current;
+		}
+		if (current == head) {
+			temp->previous = nullptr;
+			head = temp;
+		}
+		else if (current->previous->right == current) {
+			current->previous->right = temp;
+		}
+		else {
+			current->previous->left = temp;
+		}
+		current->previous = temp;
+	}
+
+	/*Double rotation to keep everything balanced for the left.*/
+	void doubleLeft(Node * current) {
+		Node * temp;//I really tried to use the old stuff but I couldn't. Works a lot like singleLeft and singleRight.
+		temp = current->left->right;
+		temp->left = current->left;
+		temp->right = current;
+		temp->left->previous = temp;
+		temp->left->right = nullptr;
+		temp->right->left = nullptr;
+		temp->previous = current->previous;
+		if (current == head) {
+			temp->previous = nullptr;
+			head = temp;
+		}
+		else if (current->previous->right == current) {
+			current->previous->right = temp;
+		}
+		else {
+			current->previous->left = temp;
+		}
+		current->previous = temp;
+	}
+
+	/*Double rotation to keep everything balanced for the right. Like the previous.*/
+	void doubleRight(Node * current) {
+		Node * temp; //I really tried to use the old stuff but I couldn't. Works a lot like singleLeft and singleRight.
+		temp = current->right->left;
+		temp->right = current->right;
+		temp->left = current;
+		temp->right->previous = temp;
+		temp->right->left = nullptr;
+		temp->left->right = nullptr;
+		temp->previous = current->previous;
+		if (current == head) {
+			temp->previous = nullptr;
+			head = temp;
+		}
+		else if (current->previous->right == current) {
+			current->previous->right = temp;
+		}
+		else {
+			current->previous->left = temp;
+		}
+		current->previous = temp;
 	}
 };
